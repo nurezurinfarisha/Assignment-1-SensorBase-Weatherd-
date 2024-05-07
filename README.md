@@ -1,4 +1,4 @@
-# Weather Station with NodeMCU ESP8266, OLED Display, and DHT11 Sensor
+# Assignment 1: Weather Station with NodeMCU ESP8266, OLED Display, and DHT11 Sensor
 Prepared by: 
 Name: NUR EZURIN FARISHA BINTI JUSSHAIRI 
 Matric No: 284253
@@ -53,14 +53,6 @@ This project combines the power of NodeMCU ESP8266, an OLED display, and a DHT11
 3. Use the OLED display navigation buttons to switch between different views (time/date, temperature, humidity, forecast).
 4. Enjoy real-time weather updates at a glance!
 
-## Contributing
+## Youtube Link
 
-Contributions are welcome! If you'd like to improve this project, feel free to fork the repository and submit a pull request with your changes.
 
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-Feel free to customize this template according to your project's specific details and requirements!
