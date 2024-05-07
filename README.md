@@ -2,6 +2,7 @@
 Prepared by: 
 Name: NUR EZURIN FARISHA BINTI JUSSHAIRI 
 Matric No: 284253
+
 ## Overview
 
 This project combines the power of NodeMCU ESP8266, an OLED display, and a DHT11 sensor to create a weather station that provides real-time temperature, humidity, and weather forecast information. The weather data is fetched from the OpenWeatherMap API.
