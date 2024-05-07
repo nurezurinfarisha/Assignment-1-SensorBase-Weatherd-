@@ -2,9 +2,9 @@
 #include <ESPWiFi.h>
 #include <ESPHTTPClient.h>
 #include <JsonListener.h> 
-#include <time.h>                       // time() ctime()
-#include <sys/time.h>                   // struct timeval
-#include <coredecls.h>                  // settimeofday_cb()
+#include <time.h>                       // Time related functions: time() ctime()
+#include <sys/time.h>                   // Time structures: struct timeval
+#include <coredecls.h>                  // Callback for time setting: settimeofday_cb()
 
 #include "SSD1306Wire.h"
 #include "OLEDDisplayUi.h"
@@ -15,34 +15,38 @@
 #include "WeatherStationImages.h"
 #include "DHT.h"
 
-const char* WIFI_SSID = "Ezu";
-const char* WIFI_PWD = "ezu2142002";
+// WiFi credentials
+const char* WIFI_SSID = "UUMWiFi_Guest";
+const char* WIFI_PWD = "";
 
+// Timezone and daylight saving time adjustment
 #define TZ              8       // (utc+) TZ in hours
 #define DST_MN          0      // use 60mn for summer time in some countries
 
-// Setup
-const int UPDATE_INTERVAL_SECS = 10 * 60; // Update every 30 minutes
+// Update interval for weather data (in seconds)
+const int UPDATE_INTERVAL_SECS = 10 * 60; // Update every 10 minutes
 
 // Display Settings
-const int I2C_DISPLAY_ADDRESS = 0x3C;
+const int I2C_DISPLAY_ADDRESS = 0x3C; // I2C address of OLED display
 #if defined(ESP8266)
-const int SDA_PIN = D2;
-const int SDC_PIN = D1;
+const int SDA_PIN = D2; // SDA pin for ESP8266
+const int SDC_PIN = D1; // SDC pin for ESP8266
 #else
-const int SDA_PIN = 19; //D3;
-const int SDC_PIN = 20; //D4;
+const int SDA_PIN = 19; // SDA pin for other platforms
+const int SDC_PIN = 20; // SDC pin for other platformss
 #endif
 
-String OPEN_WEATHER_MAP_APP_ID = "24fd5f0ca6bdd503eefa54abc4ad497a";
-String OPEN_WEATHER_MAP_LOCATION_ID = "1736278";
+// OpenWeatherMap settings
+String OPEN_WEATHER_MAP_APP_ID = "24fd5f0ca6bdd503eefa54abc4ad497a"; // API key
+String OPEN_WEATHER_MAP_LOCATION_ID = "1736278"; // Location ID
 
-String OPEN_WEATHER_MAP_LANGUAGE = "en";
-const uint8_t MAX_FORECASTS = 4;
+String OPEN_WEATHER_MAP_LANGUAGE = "en"; // Language
+const uint8_t MAX_FORECASTS = 4; // Maximum number of forecast days
+
 
 const boolean IS_METRIC = true;
 
-// Adjust according to your language
+// Day and month names for date display
 const String WDAY_NAMES[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
 const String MONTH_NAMES[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
 
@@ -51,13 +55,14 @@ const String MONTH_NAMES[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "
  **************************/
  SSD1306Wire     display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
  OLEDDisplayUi   ui( &display );
-
+// Current weather and forecast data
 OpenWeatherMapCurrentData currentWeather;
 OpenWeatherMapCurrent currentWeatherClient;
 
 OpenWeatherMapForecastData forecasts[MAX_FORECASTS];
 OpenWeatherMapForecast forecastClient;
 
+// Time variables
 #define TZ_MN           ((TZ)*60)
 #define TZ_SEC          ((TZ)*3600)
 #define DST_SEC         ((DST_MN)*60)
@@ -66,8 +71,10 @@ time_t now;
 // flag changed in the ticker function every 10 minutes
 bool readyForWeatherUpdate = false;
 
+// Last update time
 String lastUpdate = "--";
 
+// Time since last weather update
 long timeSinceLastWUpdate = 0;
 
 //declaring prototypes
@@ -88,6 +95,7 @@ int numberOfFrames = 5;
 OverlayCallback overlays[] = { drawHeaderOverlay };
 int numberOfOverlays = 1;
 
+// DHT sensor object
 DHT dht = DHT(D5, DHT11, 6);
 
 void setup() {
@@ -95,7 +103,7 @@ void setup() {
   Serial.println();
   Serial.println();
 
-  // initialize dispaly
+  // initialize display
   display.init();
   display.clear();
   display.display();
@@ -104,10 +112,13 @@ void setup() {
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setContrast(255);
 
+// Initialize DHT sensor
   dht.begin();
   WiFi.begin(WIFI_SSID, WIFI_PWD);
 
   int counter = 0;
+
+  // Connect to WiFi
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -123,7 +134,7 @@ void setup() {
 
   // Get time from network time service
   configTime(TZ_SEC, DST_SEC, "pool.ntp.org");
-
+  // Set up OLED display UI
   ui.setTargetFPS(30);
 
   ui.setActiveSymbol(activeSymbole);
@@ -155,7 +166,8 @@ void setup() {
   display.drawXbm(26,0,logo1_width,logo1_height,logo1_bits);
   display.display();
   delay(5000);
-  
+
+  // Display initial loading messages
   display.clear();
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
@@ -181,16 +193,16 @@ void setup() {
 
 void loop() {
   
-  
+  // Check if it's time to update weather data
   if (millis() - timeSinceLastWUpdate > (1000L*UPDATE_INTERVAL_SECS)) {
     setReadyForWeatherUpdate();
     timeSinceLastWUpdate = millis();
   }
-
+ // Update weather data if ready and UI frame is fixed
   if (readyForWeatherUpdate && ui.getUiState()->frameState == FIXED) {
     updateData(&display);
   }
-
+// Update UI
   int remainingTimeBudget = ui.update();
 
   if (remainingTimeBudget > 0) {
@@ -202,7 +214,7 @@ void loop() {
 
 
 }
-
+// Function to draw progress bar on display
 void drawProgress(OLEDDisplay *display, int percentage, String label) {
   display->clear();
   display->setTextAlignment(TEXT_ALIGN_CENTER);
@@ -211,7 +223,7 @@ void drawProgress(OLEDDisplay *display, int percentage, String label) {
   display->drawProgressBar(2, 28, 124, 10, percentage);
   display->display();
 }
-
+// Function to update weather data
 void updateData(OLEDDisplay *display) {
   drawProgress(display, 10, "Updating time...");
   drawProgress(display, 30, "Updating weather...");
@@ -230,8 +242,7 @@ void updateData(OLEDDisplay *display) {
   delay(1000);
 }
 
-
-
+// Function to draw date and time on display
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   now = time(nullptr);
   struct tm* timeInfo;
@@ -252,6 +263,7 @@ void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
   display->setTextAlignment(TEXT_ALIGN_LEFT);
 }
 
+// Function to draw temperature on display
 void drawTemp(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
 
   float temperature = dht.readTemperature();
@@ -266,6 +278,7 @@ void drawTemp(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_
   display->setTextAlignment(TEXT_ALIGN_LEFT);
 }
 
+// Function to draw humidity on display
 void drawHum(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
 
   int humidity = dht.readHumidity();
@@ -280,6 +293,7 @@ void drawHum(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t
   display->setTextAlignment(TEXT_ALIGN_LEFT);
 }
 
+// Function to draw current weather on display
 void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   display->setFont(ArialMT_Plain_10);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
@@ -295,13 +309,15 @@ void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t
   display->drawString(23  + x, 0 + y, currentWeather.iconMeteoCon);
 }
 
-
+// Function to draw forecast on display
 void drawForecast(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   drawForecastDetails(display, x, y, 0);
   drawForecastDetails(display, x + 44, y, 1);
   drawForecastDetails(display, x + 88, y, 2);
 }
 
+
+// Function to draw forecast details on display
 void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex) {
   time_t observationTimestamp = forecasts[dayIndex].observationTime;
   struct tm* timeInfo;
@@ -318,6 +334,8 @@ void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex) {
   display->setTextAlignment(TEXT_ALIGN_LEFT);
 }
 
+
+// Function to draw header overlay on display
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
   now = time(nullptr);
   struct tm* timeInfo;
@@ -335,6 +353,7 @@ void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
   display->drawHorizontalLine(0, 52, 128);
 }
 
+// Function to set flag for weather update
 void setReadyForWeatherUpdate() {
   Serial.println("Setting readyForUpdate to true");
   readyForWeatherUpdate = true;
